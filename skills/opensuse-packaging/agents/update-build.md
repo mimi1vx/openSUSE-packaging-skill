@@ -33,7 +33,7 @@ python3 <skill>/scripts/refsection.py osc-usage.md "Tool discipline"
 | the build failed | `update-build.md` "Common build pitfalls" — then the one `build-pitfalls.md` section its table points at (toolchain / build-system+offline / dependency-flag hygiene) |
 | Rust, Go or npm vendor tree | `language-packaging.md` — that language's section only |
 | Python package | `language-packaging.md` "Python singlespec deep-dive" (and its `###` sub-sections) |
-| KF6 / Qt6 / Kirigami app in a KDE:* devel project (`find_package(ECM`, `KDEInstallDirs`) | `kde-packaging.md` "KF6 / ECM packages (Qt6, Kirigami)" |
+| a spec using `%cmake_kf6`, or a KF6 / Qt6 / Kirigami app in a KDE:* devel project (`find_package(ECM`, `KDEInstallDirs`) | `kde-packaging.md` "KF6 / ECM packages (Qt6, Kirigami)" |
 | the package has a `_service` | `source-services.md` "Service modes decide what you run AND what you commit" |
 | patches to rebase, drop or add | `patches.md` "Patches"; creating/refreshing one: `quilt-patches.md` |
 | spec-cleaner disagrees with you | `spec-cleaner.md` "Checking a spec file" |

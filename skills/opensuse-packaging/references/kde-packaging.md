@@ -10,10 +10,11 @@ Applies to a package whose devel project is KDE:* (KDE:Extra, KDE:Applications, 
 `CMakeLists.txt` has `find_package(ECM …)` and `include(KDEInstallDirs)`, building against
 Qt6/KF6; a dual Qt5/Qt6 project also needs its Qt6 switch (kommit:
 `-DBUILD_WITH_QT6:BOOL=TRUE`). Other devel projects accept the generic forms (easyeffects in
-multimedia:apps uses `%cmake` and `%{_bindir}`): match what the package already uses there.
-KDE:Extra reviewers decline the generic forms, and every spec sampled there (haruna, kaidan,
-koi, drawy, kommit, imprint, kgeotag, klevernotes) uses the KF6 build macros, the
-`%{_kf6_*dir}` paths and `kf6-extra-cmake-modules`.
+multimedia:apps uses `%cmake` and `%{_bindir}`): match what the package already uses there. The
+`%cmake_kf6` facts below hold for any spec that uses it; which forms to write is the KDE:*
+convention. A KDE:Extra review declined the generic forms (sr#1381075), and every spec sampled
+there (haruna, kaidan, koi, drawy, kommit, imprint, kgeotag, klevernotes) uses the KF6 build
+macros, the `%{_kf6_*dir}` paths and `kf6-extra-cmake-modules`.
 
 | generic form | KF6 form |
 |---|---|
@@ -38,26 +39,29 @@ The full set is in `macros.kf6` (`osc cat openSUSE:Factory kf6-filesystem macros
   (`if(BUILD_TESTING)`, `autotests/`, `ecm_add_test`), configure with
   `%cmake_kf6 -DBUILD_TESTING:BOOL=ON` and run `%ctest` in `%check`, as kaidan does. Judge
   "no upstream tests" from the source tree, never from a `%ctest` run after a bare
-  `%cmake_kf6`; then leave `%check` out (`references/specfile-guidelines.md` "Spec file —
-  general rules").
+  `%cmake_kf6`; then leave `%check` out
+  (`references/specfile-guidelines.md` "%prep / %build / %install / %check").
 - **No Ninja setup.** `%cmake_kf6` already generates for Ninja (kf6-filesystem requires
-  `ninja`) and ignores `%__builder`; `%kf6_use_make` switches to make.
+  `ninja`) and ignores `%__builder`; `%kf6_use_make` before `%cmake_kf6` switches to make.
 - **spec-cleaner** braces `%kf6_build`/`%kf6_install` (→ `%{kf6_build}`/`%{kf6_install}`),
   moves a `%if %{with released}` Source block below the dependencies and drops the blank line
   after the `%define`s: take its output, the expansion is the same.
 - **No `gcc-c++` BuildRequires.** `kf6-extra-cmake-modules` Requires the C++ compiler
-  `%cmake_kf6` uses (`gcc-c++`; `gcc15-c++` on 16.x). Add a `gccNN-c++` only when upstream
-  needs a newer compiler than the codestream's (kwin6).
+  `%cmake_kf6` uses (`gcc-c++`; on 16.1 `gcc15-c++`, which `%cmake_kf6` pins there). When
+  upstream needs a newer compiler, add `gccNN-c++` and pass
+  `-DCMAKE_C_COMPILER:STRING=gcc-NN -DCMAKE_CXX_COMPILER:STRING=g++-NN` after `%cmake_kf6`,
+  as kwin6 does.
 - **Linking `Qt6::Sql` does not install a database driver.** Grep the source for the name
   passed to `QSqlDatabase::addDatabase` and add the matching `Requires:` (`QSQLITE` →
   `qt6-sql-sqlite`, `QPSQL` → `qt6-sql-postgresql`, `QMYSQL` → `qt6-sql-mysql`, `QODBC` →
   `qt6-sql-unixODBC`); add it as a BuildRequires too only if `%check` opens a database
   (kaidan).
 - **QML imports:** when the QML is compiled into the binary (`qt_add_qml_module`, qrc),
-  qml-autoreqprov cannot see it. Add `Requires: qt6qmlimport(<module>)` per `import` line
-  (imprint) or the `*-imports` packages (klevernotes: `kf6-kirigami-imports`,
-  `kirigami-addons6`, `qt6-declarative-imports`); check with
-  `rpm -qp --requires <rpm> | grep qmlimport`.
+  qml-autoreqprov cannot see it: `rpm -qpl <rpm> | grep -c '\.qml$'` of 0 means nothing was
+  generated. Declare every module the sources import
+  (`grep -rhoE '^import [A-Za-z.]+' --include='*.qml' .`) as `Requires: qt6qmlimport(<module>)`
+  (imprint) or through the `*-imports` packages (klevernotes: `kf6-kirigami-imports`,
+  `kirigami-addons6`, `qt6-declarative-imports`).
 - **Translations**, when upstream installs catalogs: `%lang_package`; `%find_lang %{name}` with
   the flags for what it installs — `--all-name` when catalog names differ from `%{name}`,
   `--with-html` for KDocTools handbooks, `--with-qt` for Qt `.qm`, `--with-man` for localized
