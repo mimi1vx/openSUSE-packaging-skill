@@ -48,7 +48,7 @@ The full set is in `macros.kf6` (`osc cat openSUSE:Factory kf6-filesystem macros
   after the `%define`s: take its output, the expansion is the same.
 - **No `gcc-c++` BuildRequires.** `kf6-extra-cmake-modules` Requires the C++ compiler
   `%cmake_kf6` uses (`gcc-c++`; on 16.1 `gcc15-c++`, which `%cmake_kf6` pins there). When
-  upstream needs a newer compiler, add `gccNN-c++` and pass
+  upstream needs a newer compiler, add `gccNN-c++` and `gccNN-PIE` and pass
   `-DCMAKE_C_COMPILER:STRING=gcc-NN -DCMAKE_CXX_COMPILER:STRING=g++-NN` after `%cmake_kf6`,
   as kwin6 does.
 - **Linking `Qt6::Sql` does not install a database driver.** Grep the source for the name
@@ -59,9 +59,11 @@ The full set is in `macros.kf6` (`osc cat openSUSE:Factory kf6-filesystem macros
 - **QML imports:** when the QML is compiled into the binary (`qt_add_qml_module`, qrc),
   qml-autoreqprov cannot see it: `rpm -qpl <rpm> | grep -c '\.qml$'` of 0 means nothing was
   generated. Declare every module the sources import
-  (`grep -rhoE '^import [A-Za-z.]+' --include='*.qml' .`) as `Requires: qt6qmlimport(<module>)`
-  (imprint) or through the `*-imports` packages (klevernotes: `kf6-kirigami-imports`,
-  `kirigami-addons6`, `qt6-declarative-imports`).
+  (`grep -rhoE '^import [A-Za-z.]+' --include='*.qml' .`), minus the package's own URI from
+  `ecm_add_qml_module`/`qt_add_qml_module` — nothing provides that one (klevernotes:
+  `org.kde.klevernotes`) — as `Requires: qt6qmlimport(<module>)` (imprint) or through the
+  `*-imports` packages (klevernotes: `kf6-kirigami-imports`, `kirigami-addons6`,
+  `qt6-declarative-imports`).
 - **Translations**, when upstream installs catalogs: `%lang_package`; `%find_lang %{name}` with
   the flags for what it installs — `--all-name` when catalog names differ from `%{name}`,
   `--with-html` for KDocTools handbooks, `--with-qt` for Qt `.qm`, `--with-man` for localized
