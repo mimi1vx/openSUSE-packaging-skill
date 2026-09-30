@@ -1,16 +1,19 @@
 # KDE Frameworks 6 / Qt6 applications
 
 Owner of: the KF6 build and install macros, the `%{_kf6_*dir}` file-list macros and the
-KDE:Extra conventions for ECM-based (Qt6 / Kirigami) packages. The generic CMake rules stay in
-`references/specfile-guidelines.md`; this file is where they do not apply.
+KDE:* devel-project conventions for ECM-based (Qt6 / Kirigami) packages. The generic CMake
+rules stay in `references/specfile-guidelines.md`; this file is where they do not apply.
 
 ## KF6 / ECM packages (Qt6, Kirigami)
 
-Applies when upstream's `CMakeLists.txt` has `find_package(ECM … NO_MODULE)` and
-`include(KDEInstallDirs)`. Write the KF6 forms from the start: KDE:Extra reviewers decline the
-generic ones, and every spec sampled there (haruna, kaidan, koi, drawy, kommit, imprint,
-kgeotag, klevernotes) uses the KF6 build macros, the `%{_kf6_*dir}` paths and
-`kf6-extra-cmake-modules`.
+Applies to a package whose devel project is KDE:* (KDE:Extra, KDE:Applications, …) and whose
+`CMakeLists.txt` has `find_package(ECM …)` and `include(KDEInstallDirs)`, building against
+Qt6/KF6; a dual Qt5/Qt6 project also needs its Qt6 switch (kommit:
+`-DBUILD_WITH_QT6:BOOL=TRUE`). Other devel projects accept the generic forms (easyeffects in
+multimedia:apps uses `%cmake` and `%{_bindir}`): match what the package already uses there.
+KDE:Extra reviewers decline the generic forms, and every spec sampled there (haruna, kaidan,
+koi, drawy, kommit, imprint, kgeotag, klevernotes) uses the KF6 build macros, the
+`%{_kf6_*dir}` paths and `kf6-extra-cmake-modules`.
 
 | generic form | KF6 form |
 |---|---|
@@ -21,28 +24,48 @@ kgeotag, klevernotes) uses the KF6 build macros, the `%{_kf6_*dir}` paths and
 | `%{_datadir}/knotifications6` | `%{_kf6_notificationsdir}` |
 | `%{_datadir}/metainfo` | `%{_kf6_appstreamdir}` |
 | `%{_datadir}/icons` | `%{_kf6_iconsdir}` |
-| `BuildRequires: extra-cmake-modules` | `BuildRequires: kf6-extra-cmake-modules >= X.Y` (X.Y = the ECM version in `find_package(ECM …)`) |
+| `%{_datadir}/qlogging-categories6` | `%{_kf6_debugdir}` |
+| `%{_datadir}/doc/HTML` | `%{_kf6_htmldir}` |
+| `%{_datadir}/<app>` | `%{_kf6_sharedir}/<app>` — not `%{_kf6_datadir}` (= `/usr/share/kf6`) |
+| `BuildRequires: extra-cmake-modules` | `BuildRequires: kf6-extra-cmake-modules >= X.Y` (the version `find_package(ECM …)` asks for, usually `${KF_MIN_VERSION}`; take it from upstream, not from a sampled spec) |
 
-- **Keep `%kf6_build` and `%kf6_install` bare.** spec-cleaner rewrites them to
-  `%{kf6_build}` / `%{kf6_install}`; both forms expand the same and build the same, but the
-  bare form is what KDE:Extra specs and their reviewers use. Treat that one diff line as an
-  accepted spec-cleaner deviation (`references/spec-cleaner.md` "Checking a spec file"), and
-  check the rest of the diff is empty.
-- **No `gcc-c++` BuildRequires.** None of the sampled specs lists it, and the build finds a C++
-  compiler without it; a reviewer flagged it as unneeded.
-- **Linking `Qt6::Sql` does not install a database driver.** Grep the source for the name passed
-  to `QSqlDatabase::addDatabase` and add the matching `Requires: qt6-sql-<driver>`
-  (`QSQLITE` → `qt6-sql-sqlite`). kaidan lists it under both BuildRequires and Requires.
-- **Declare the runtime QML imports by hand** when rpm does not detect them, as klevernotes does:
-  `kf6-kirigami-imports`, `kirigami-addons6`, `qt6-declarative-imports`, plus any other
-  `kf6-*-imports` the QML files import.
-- **Translations:** `%lang_package`, `%find_lang %{name} --all-name` in `%install` and
-  `%files lang -f %{name}.lang` (7 of the 8 sampled specs).
-- **No upstream tests → no `%check` section at all**, not a comment-only placeholder. The
-  rpmlint `no-%check-section` warning is expected; a KDE:Extra reviewer asked for exactly that.
+The full set is in `macros.kf6` (`osc cat openSUSE:Factory kf6-filesystem macros.kf6`).
+`%{_kf6_includedir}`, `%{_kf6_localedir}` and `%{_kf6_libexecdir}` are framework paths
+(`…/KF6`, `…/kf6`); an app keeps `%{_includedir}` and `%{_libexecdir}`.
+
+- **`%cmake_kf6` is not a drop-in `%cmake`: it passes `-DBUILD_TESTING:BOOL=FALSE`**, so a
+  kept `%ctest` prints `No tests were found!!!` and passes. When upstream has tests
+  (`if(BUILD_TESTING)`, `autotests/`, `ecm_add_test`), configure with
+  `%cmake_kf6 -DBUILD_TESTING:BOOL=ON` and run `%ctest` in `%check`, as kaidan does. Judge
+  "no upstream tests" from the source tree, never from a `%ctest` run after a bare
+  `%cmake_kf6`; then leave `%check` out (`references/specfile-guidelines.md` "Spec file —
+  general rules").
+- **No Ninja setup.** `%cmake_kf6` already generates for Ninja (kf6-filesystem requires
+  `ninja`) and ignores `%__builder`; `%kf6_use_make` switches to make.
+- **spec-cleaner** braces `%kf6_build`/`%kf6_install` (→ `%{kf6_build}`/`%{kf6_install}`),
+  moves a `%if %{with released}` Source block below the dependencies and drops the blank line
+  after the `%define`s: take its output, the expansion is the same.
+- **No `gcc-c++` BuildRequires.** `kf6-extra-cmake-modules` Requires the C++ compiler
+  `%cmake_kf6` uses (`gcc-c++`; `gcc15-c++` on 16.x). Add a `gccNN-c++` only when upstream
+  needs a newer compiler than the codestream's (kwin6).
+- **Linking `Qt6::Sql` does not install a database driver.** Grep the source for the name
+  passed to `QSqlDatabase::addDatabase` and add the matching `Requires:` (`QSQLITE` →
+  `qt6-sql-sqlite`, `QPSQL` → `qt6-sql-postgresql`, `QMYSQL` → `qt6-sql-mysql`, `QODBC` →
+  `qt6-sql-unixODBC`); add it as a BuildRequires too only if `%check` opens a database
+  (kaidan).
+- **QML imports:** when the QML is compiled into the binary (`qt_add_qml_module`, qrc),
+  qml-autoreqprov cannot see it. Add `Requires: qt6qmlimport(<module>)` per `import` line
+  (imprint) or the `*-imports` packages (klevernotes: `kf6-kirigami-imports`,
+  `kirigami-addons6`, `qt6-declarative-imports`); check with
+  `rpm -qp --requires <rpm> | grep qmlimport`.
+- **Translations**, when upstream installs catalogs: `%lang_package`; `%find_lang %{name}` with
+  the flags for what it installs — `--all-name` when catalog names differ from `%{name}`,
+  `--with-html` for KDocTools handbooks, `--with-qt` for Qt `.qm`, `--with-man` for localized
+  man pages; and `%files lang -f %{name}.lang` (6 of the 8 sampled specs).
 - **Sample before writing a new one:** `osc cat KDE:Extra <pkg> <pkg>.spec` for two or three
-  current specs (klevernotes is a small Kirigami app). That is the packaging-structure survey of
-  Core directive item 9 for this ecosystem.
+  current specs — for layout, not correctness (klevernotes never builds its upstream
+  `src/autotests`, and its version floors lag upstream's). This is in addition to the
+  cross-distro survey of Core directive item 9, not a substitute.
 
 Real case: transistor (sr#1381075) — declined for the generic `%cmake` macros, `%{_bindir}` /
 `%{_datadir}` paths, plain `extra-cmake-modules`, a `gcc-c++` BuildRequires and a missing
